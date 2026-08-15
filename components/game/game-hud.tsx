@@ -8,10 +8,11 @@ import { X } from "lucide-react"
 
 // ─── Fullscreen helper ──────────────────────────────────────────────
 function requestFullscreen() {
-  const el = document.documentElement as any
-  if (el.requestFullscreen) el.requestFullscreen()
-  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
-  else if (el.msRequestFullscreen) el.msRequestFullscreen()
+  try {
+    const el = document.documentElement as any
+    if (el.requestFullscreen) el.requestFullscreen()
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen()
+  } catch {}
 }
 
 // ─── Joystick ────────────────────────────────────────────────────────
@@ -33,7 +34,8 @@ function Joystick() {
       const ny = len > 0 ? dy / len : 0
       knob.style.transform = `translate(${nx * clamped}px, ${ny * clamped}px)`
       controls.moveX = (nx * clamped) / radius
-      controls.moveY = (ny * clamped) / radius
+      // Invert Y: screen-down is positive in clientY, but game-forward is negative moveY
+      controls.moveY = -(ny * clamped) / radius
     }
 
     function reset() {
@@ -85,13 +87,11 @@ function Joystick() {
     <div
       ref={baseRef}
       data-hud-control
-      className="absolute bottom-5 left-5 h-[88px] w-[88px] rounded-full"
+      className="absolute bottom-5 left-5 h-[88px] w-[88px] rounded-full z-30"
       style={{ touchAction: "none", background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)", border: "1.5px solid rgba(255,255,255,0.08)" }}
     >
-      {/* Cross lines */}
       <div className="absolute left-1/2 top-2 bottom-2 w-px bg-white/5 -translate-x-1/2" />
       <div className="absolute top-1/2 left-2 right-2 h-px bg-white/5 -translate-y-1/2" />
-      {/* Knob */}
       <div
         ref={knobRef}
         className="absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full"
@@ -101,17 +101,15 @@ function Joystick() {
   )
 }
 
-// ─── Look Area ───────────────────────────────────────────────────────
+// ─── Look Area (drag anywhere except HUD controls to look around) ───
 function LookArea() {
   const activeId = useRef<number | null>(null)
   const last = useRef({ x: 0, y: 0 })
-  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const el = ref.current!
     function onDown(e: PointerEvent) {
       if (activeId.current !== null) return
-      // Don't capture if touch started on a HUD control
+      // Ignore touches on HUD controls (joystick, buttons, buy menu, etc.)
       const target = e.target as HTMLElement
       if (target.closest("[data-hud-control]")) return
       activeId.current = e.pointerId
@@ -119,27 +117,30 @@ function LookArea() {
     }
     function onMove(e: PointerEvent) {
       if (e.pointerId !== activeId.current) return
-      controls.lookDX += (e.clientX - last.current.x) * 1.2
-      controls.lookDY += (e.clientY - last.current.y) * 1.2
+      const dx = e.clientX - last.current.x
+      const dy = e.clientY - last.current.y
+      controls.lookDX += dx * 1.5
+      controls.lookDY += dy * 1.5
       last.current = { x: e.clientX, y: e.clientY }
     }
     function onUp(e: PointerEvent) {
       if (e.pointerId !== activeId.current) return
       activeId.current = null
     }
-    el.addEventListener("pointerdown", onDown)
-    window.addEventListener("pointermove", onMove)
-    window.addEventListener("pointerup", onUp)
-    window.addEventListener("pointercancel", onUp)
+    // Listen on document so we catch ALL touches
+    document.addEventListener("pointerdown", onDown)
+    document.addEventListener("pointermove", onMove)
+    document.addEventListener("pointerup", onUp)
+    document.addEventListener("pointercancel", onUp)
     return () => {
-      el.removeEventListener("pointerdown", onDown)
-      window.removeEventListener("pointermove", onMove)
-      window.removeEventListener("pointerup", onUp)
-      window.removeEventListener("pointercancel", onUp)
+      document.removeEventListener("pointerdown", onDown)
+      document.removeEventListener("pointermove", onMove)
+      document.removeEventListener("pointerup", onUp)
+      document.removeEventListener("pointercancel", onUp)
     }
   }, [])
 
-  return <div ref={ref} className="absolute inset-0" style={{ touchAction: "none" }} />
+  return null
 }
 
 // ─── Action Button ───────────────────────────────────────────────────
@@ -193,8 +194,8 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
   const canAfford = (price: number) => hud.money >= price
 
   return (
-    <div data-hud-control className="absolute inset-0 z-50 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden rounded-2xl" style={{ background: "rgba(10,6,20,0.85)", border: "1px solid rgba(168,85,247,0.15)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" }}>
+    <div data-hud-control className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden rounded-2xl" style={{ background: "rgba(10,6,20,0.9)", border: "1px solid rgba(168,85,247,0.15)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
           <div>
@@ -202,7 +203,7 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
             <p className="font-mono text-sm font-bold" style={{ color: "oklch(0.72 0.14 195)" }}>${hud.money}</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-white/40 hover:text-white/80 active:scale-95">
-            <X className="size-4" />
+            <X className="size-5" />
           </button>
         </div>
 
@@ -228,10 +229,10 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
             (Object.values(WEAPONS) as typeof WEAPONS.pistol[]).map((w) => (
               <button
                 key={w.id}
-                onClick={() => engine.buyWeapon(w.id as any)}
+                onClick={() => { engine.buyWeapon(w.id as any) }}
                 disabled={!canAfford(w.price)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all active:scale-[0.98] ${
-                  canAfford(w.price) ? "bg-white/[0.04] hover:bg-white/[0.07]" : "opacity-25"
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${
+                  canAfford(w.price) ? "bg-white/[0.04]" : "opacity-25"
                 }`}
               >
                 <div>
@@ -249,10 +250,10 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
             (Object.values(GEAR) as typeof GEAR.shield_light[]).filter(g => g.id !== 'bomb').map((g) => (
               <button
                 key={g.id}
-                onClick={() => engine.buyGear(g.id as any)}
+                onClick={() => { engine.buyGear(g.id as any) }}
                 disabled={!canAfford(g.price)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-all active:scale-[0.98] ${
-                  canAfford(g.price) ? "bg-white/[0.04] hover:bg-white/[0.07]" : "opacity-25"
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${
+                  canAfford(g.price) ? "bg-white/[0.04]" : "opacity-25"
                 }`}
               >
                 <div>
@@ -284,16 +285,14 @@ function MatchEndScreen({ onExit }: { onExit: () => void }) {
   const won = hud.matchWinner === "A"
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center">
+    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-auto">
       <div className="absolute inset-0" style={{ background: "rgba(10,6,20,0.8)", backdropFilter: "blur(16px)" }} />
       <div className="relative w-full max-w-xs mx-4 rounded-2xl p-8 text-center" style={{ background: "rgba(10,6,20,0.9)", border: `1px solid ${won ? "rgba(168,85,247,0.3)" : "rgba(34,211,238,0.3)"}`, boxShadow: `0 0 40px ${won ? "rgba(168,85,247,0.15)" : "rgba(34,211,238,0.15)"}` }}>
         <p className="font-mono text-[9px] tracking-[0.3em] text-white/40 mb-3">MATCH OVER</p>
-        <p className={`font-mono text-3xl font-black tracking-[0.15em] mb-1`} style={{ color: won ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 20px ${won ? "rgba(168,85,247,0.5)" : "rgba(34,211,238,0.5)"}` }}>
+        <p className="font-mono text-3xl font-black tracking-[0.15em] mb-1" style={{ color: won ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 20px ${won ? "rgba(168,85,247,0.5)" : "rgba(34,211,238,0.5)"}` }}>
           {won ? "VICTORY" : "DEFEAT"}
         </p>
-        <p className="font-mono text-xs text-white/40 mb-6">
-          {hud.scoreA} — {hud.scoreB}
-        </p>
+        <p className="font-mono text-xs text-white/40 mb-6">{hud.scoreA} — {hud.scoreB}</p>
         <button
           data-hud-control
           onClick={onExit}
@@ -314,29 +313,25 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
   const shieldPct = Math.max(0, Math.min(100, hud.shield))
   const weapon = WEAPONS[hud.weaponId]
   const [showBuy, setShowBuy] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Request fullscreen on mount
   useEffect(() => {
     requestFullscreen()
-    function onFsChange() { setIsFullscreen(!!document.fullscreenElement) }
-    document.addEventListener("fullscreenchange", onFsChange)
-    return () => document.removeEventListener("fullscreenchange", onFsChange)
   }, [])
 
   const handleExit = useCallback(() => {
-    if (document.fullscreenElement) document.exitFullscreen?.()
+    try { if (document.fullscreenElement) document.exitFullscreen() } catch {}
     resetControls()
     onExit?.()
   }, [onExit])
 
   const now = performance.now()
   const showDamage = now - hud.damageFlash < 200
-
   const hpColor = hpPct > 50 ? "oklch(0.65 0.22 290)" : hpPct > 25 ? "oklch(0.75 0.16 80)" : "oklch(0.58 0.2 25)"
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono text-white">
+      {/* Look area — no DOM element, uses document listeners */}
       <LookArea />
 
       {/* Damage vignette */}
@@ -344,7 +339,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(239,68,68,0.25) 100%)" }} />
       )}
 
-      {/* ── Score pill (top center) ── */}
+      {/* ── Score pill ── */}
       <div className="absolute left-1/2 top-2 -translate-x-1/2 pointer-events-none">
         <div className="flex items-center gap-2 rounded-full px-4 py-1" style={{ background: "rgba(10,6,20,0.6)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
           <span className="text-sm font-black tabular-nums" style={{ color: "oklch(0.65 0.22 290)", textShadow: "0 0 8px rgba(168,85,247,0.4)" }}>{hud.scoreA}</span>
@@ -358,14 +353,14 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
 
       {/* ── Buy phase button ── */}
       {hud.phase === "buy" && !showBuy && (
-        <div className="absolute left-1/2 top-11 -translate-x-1/2 pointer-events-auto">
+        <div className="absolute left-1/2 top-11 -translate-x-1/2 pointer-events-auto z-30">
           <button
             data-hud-control
             onClick={() => setShowBuy(true)}
-            className="rounded-full px-4 py-1.5 active:scale-95 transition-transform"
-            style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.2)", boxShadow: "0 0 12px rgba(34,211,238,0.1)" }}
+            className="rounded-full px-5 py-2 active:scale-95 transition-transform"
+            style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)", boxShadow: "0 0 16px rgba(34,211,238,0.15)" }}
           >
-            <span className="font-mono text-[9px] font-bold tracking-[0.2em]" style={{ color: "oklch(0.72 0.14 195)" }}>
+            <span className="font-mono text-[10px] font-bold tracking-[0.2em]" style={{ color: "oklch(0.72 0.14 195)" }}>
               SHOP · {hud.timer}s
             </span>
           </button>
@@ -417,13 +412,13 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       )}
 
-      {/* ── Joystick (left) ── */}
-      <div className="pointer-events-auto">
+      {/* ── Joystick ── */}
+      <div className="pointer-events-auto z-30">
         <Joystick />
       </div>
 
-      {/* ── Health (above joystick) ── */}
-      <div className="absolute bottom-[100px] left-5 w-[88px] pointer-events-none">
+      {/* ── Health ── */}
+      <div className="absolute bottom-[100px] left-5 w-[88px] pointer-events-none z-30">
         <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
           <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${hpPct}%`, background: hpColor, boxShadow: `0 0 6px ${hpColor}` }} />
         </div>
@@ -437,8 +432,8 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </p>
       </div>
 
-      {/* ── Action buttons (right) ── */}
-      <div className="pointer-events-auto absolute bottom-5 right-5 flex flex-col items-end gap-2.5">
+      {/* ── Action buttons ── */}
+      <div className="pointer-events-auto absolute bottom-5 right-5 flex flex-col items-end gap-2.5 z-30">
         <ActionBtn
           label="FIRE"
           size="lg"
@@ -454,7 +449,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       </div>
 
-      {/* ── Ammo (bottom center) ── */}
+      {/* ── Ammo ── */}
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
         <div className="rounded-xl px-4 py-1.5 text-center" style={{ background: "rgba(10,6,20,0.5)", border: "1px solid rgba(255,255,255,0.04)", backdropFilter: "blur(8px)" }}>
           <div className="flex items-baseline justify-center gap-0.5">
