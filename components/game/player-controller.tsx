@@ -11,6 +11,11 @@ import * as SFX from '@/lib/game/sound'
 const keys: Record<string, boolean> = {}
 let pointerLocked = false
 
+function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0
+}
+
 export function PlayerController({ onWeaponEvent }: { onWeaponEvent: (e: 'shoot' | 'reload') => void }) {
   const engine = useEngine()
   const { camera, gl } = useThree()
@@ -19,8 +24,9 @@ export function PlayerController({ onWeaponEvent }: { onWeaponEvent: (e: 'shoot'
   const forward = useRef(new THREE.Vector3())
   const right = useRef(new THREE.Vector3())
 
-  // Keyboard support for desktop
+  // Keyboard support for desktop only
   useEffect(() => {
+    if (isTouchDevice()) return
     function onKeyDown(e: KeyboardEvent) {
       keys[e.code] = true
       if (e.code === 'Space') controls.jumpQueued = true
@@ -35,13 +41,13 @@ export function PlayerController({ onWeaponEvent }: { onWeaponEvent: (e: 'shoot'
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
-      // Reset all keys on unmount
       Object.keys(keys).forEach(k => keys[k] = false)
     }
   }, [])
 
-  // Pointer lock for desktop mouse look
+  // Pointer lock for desktop ONLY — never on touch devices
   useEffect(() => {
+    if (isTouchDevice()) return
     const canvas = gl.domElement
     function onClick() {
       if (!pointerLocked && typeof canvas.requestPointerLock === 'function') {
@@ -76,6 +82,7 @@ export function PlayerController({ onWeaponEvent }: { onWeaponEvent: (e: 'shoot'
       document.removeEventListener('mouseup', onMouseUp)
       if (pointerLocked && document.exitPointerLock) {
         document.exitPointerLock()
+        pointerLocked = false
       }
     }
   }, [gl])
@@ -87,7 +94,7 @@ export function PlayerController({ onWeaponEvent }: { onWeaponEvent: (e: 'shoot'
     const now = performance.now() / 1000
     const w = WEAPONS[l.weapon]
 
-    // Keyboard movement
+    // Keyboard movement (desktop only)
     let kbX = 0
     let kbY = 0
     if (keys['KeyW'] || keys['ArrowUp']) kbY -= 1
