@@ -67,6 +67,44 @@ For multiplayer, everyone needs to:
 
 The game uses Supabase Realtime to sync lobbies, invites, friends, and chat between players.
 
+## Deploy to Vercel (no computer needed)
+
+You can run this game entirely from your phone browser by deploying to Vercel. Follow these steps:
+
+### Step 1: Create a Supabase project
+
+1. Go to [supabase.com](https://supabase.com) and sign up (free)
+2. Create a new project (pick any name and password, wait ~2 min for it to be ready)
+3. Go to **Settings → API** and copy these 3 values somewhere safe:
+   - **Project URL** (looks like `https://xxxxx.supabase.co`)
+   - **anon public key** (long string starting with `eyJ...`)
+   - **service_role key** (another long string starting with `eyJ...`)
+
+### Step 2: Set up the database
+
+1. In your Supabase project, go to the **SQL Editor** tab
+2. Open [scripts/001_init_schema.sql](https://github.com/tushar-alt/ballgame/blob/main/scripts/001_init_schema.sql) on GitHub and copy the entire contents
+3. Paste it into the SQL editor and hit **Run**
+4. You should see green checkmarks — database is ready
+
+### Step 3: Deploy to Vercel
+
+1. Go to [vercel.com](https://vercel.com) and sign in with your GitHub account
+2. Click **Add New → Project**
+3. Import `tushar-alt/ballgame`
+4. Before clicking Deploy, expand **Environment Variables** and add these 3:
+
+| Key | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your project URL from Step 1 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your anon key from Step 1 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your service role key from Step 1 |
+
+5. Hit **Deploy** — wait ~2 minutes
+6. You'll get a URL like `ballgame-xxxx.vercel.app` — open it and play!
+
+> **Tip:** To play multiplayer, everyone just opens the same deployed URL. The game uses Supabase Realtime to sync lobbies, invites, and chat between players.
+
 ## Tech Stack
 
 - **Next.js 16** — React framework with Turbopack
