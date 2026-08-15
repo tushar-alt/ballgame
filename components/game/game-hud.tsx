@@ -134,7 +134,7 @@ function TouchControls() {
       <div
         ref={moveRef}
         data-hud-control
-        className="absolute left-0 top-0 bottom-0 z-20"
+        className="pointer-events-auto absolute left-0 top-0 bottom-0 z-20"
         style={{ width: "45%", touchAction: "none" }}
       >
         {/* Virtual joystick knob — appears where you touch */}
@@ -159,7 +159,7 @@ function TouchControls() {
       {/* Look zone — right half */}
       <div
         ref={lookRef}
-        className="absolute right-0 top-0 bottom-0 z-10"
+        className="pointer-events-auto absolute right-0 top-0 bottom-0 z-10"
         style={{ width: "55%", touchAction: "none" }}
       >
         <div className="absolute bottom-3 right-3 pointer-events-none">
