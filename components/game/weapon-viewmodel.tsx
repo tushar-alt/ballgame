@@ -26,17 +26,17 @@ const WEAPON_MODEL_MAP: Record<WeaponId, string> = {
 
 // Model-specific scale and offset for first-person view
 const MODEL_CONFIG: Record<WeaponId, { scale: number; pos: [number, number, number]; rot: [number, number, number] }> = {
-  pistol: { scale: 0.012, pos: [0.18, -0.18, -0.35], rot: [0, -Math.PI / 2, 0] },
-  deagle: { scale: 0.014, pos: [0.18, -0.2, -0.35], rot: [0, -Math.PI / 2, 0] },
-  smg: { scale: 0.01, pos: [0.15, -0.2, -0.4], rot: [0, -Math.PI / 2, 0] },
-  uzi: { scale: 0.009, pos: [0.14, -0.18, -0.35], rot: [0, -Math.PI / 2, 0] },
-  rifle: { scale: 0.008, pos: [0.12, -0.2, -0.45], rot: [0, -Math.PI / 2, 0] },
-  ak47: { scale: 0.008, pos: [0.12, -0.2, -0.45], rot: [0, -Math.PI / 2, 0] },
-  shotgun: { scale: 0.009, pos: [0.14, -0.2, -0.42], rot: [0, -Math.PI / 2, 0] },
-  pump: { scale: 0.009, pos: [0.14, -0.2, -0.42], rot: [0, -Math.PI / 2, 0] },
-  sniper: { scale: 0.007, pos: [0.1, -0.2, -0.5], rot: [0, -Math.PI / 2, 0] },
-  laser: { scale: 0.007, pos: [0.1, -0.2, -0.5], rot: [0, -Math.PI / 2, 0] },
-  knife: { scale: 0.008, pos: [0.16, -0.16, -0.3], rot: [0.3, -Math.PI / 2, 0.1] },
+  pistol: { scale: 0.012, pos: [0.18, -0.18, -0.35], rot: [0, Math.PI / 2, 0] },
+  deagle: { scale: 0.014, pos: [0.18, -0.2, -0.35], rot: [0, Math.PI / 2, 0] },
+  smg: { scale: 0.01, pos: [0.15, -0.2, -0.4], rot: [0, Math.PI / 2, 0] },
+  uzi: { scale: 0.009, pos: [0.14, -0.18, -0.35], rot: [0, Math.PI / 2, 0] },
+  rifle: { scale: 0.008, pos: [0.12, -0.2, -0.45], rot: [0, Math.PI / 2, 0] },
+  ak47: { scale: 0.008, pos: [0.12, -0.2, -0.45], rot: [0, Math.PI / 2, 0] },
+  shotgun: { scale: 0.009, pos: [0.14, -0.2, -0.42], rot: [0, Math.PI / 2, 0] },
+  pump: { scale: 0.009, pos: [0.14, -0.2, -0.42], rot: [0, Math.PI / 2, 0] },
+  sniper: { scale: 0.007, pos: [0.1, -0.2, -0.5], rot: [0, Math.PI / 2, 0] },
+  laser: { scale: 0.007, pos: [0.1, -0.2, -0.5], rot: [0, Math.PI / 2, 0] },
+  knife: { scale: 0.008, pos: [0.16, -0.16, -0.3], rot: [0.3, Math.PI / 2, 0.1] },
 }
 
 const offset = new THREE.Vector3()
