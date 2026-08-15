@@ -15,132 +15,159 @@ function requestFullscreen() {
   } catch {}
 }
 
-// ─── Joystick ────────────────────────────────────────────────────────
-function Joystick() {
-  const baseRef = useRef<HTMLDivElement>(null)
-  const knobRef = useRef<HTMLDivElement>(null)
-  const activeId = useRef<number | null>(null)
-  const center = useRef({ x: 0, y: 0 })
+// ─── Dual-zone touch controls ────────────────────────────────────────
+// Left half = movement (virtual joystick), Right half = look around
+function TouchControls() {
+  const moveRef = useRef<HTMLDivElement>(null)
+  const lookRef = useRef<HTMLDivElement>(null)
+  const moveKnob = useRef<HTMLDivElement>(null)
+  const moveActive = useRef<number | null>(null)
+  const lookActive = useRef<number | null>(null)
+  const moveCenter = useRef({ x: 0, y: 0 })
+  const lookLast = useRef({ x: 0, y: 0 })
   const radius = 40
 
   useEffect(() => {
-    const base = baseRef.current!
-    const knob = knobRef.current!
+    const moveEl = moveRef.current!
+    const lookEl = lookRef.current!
+    const knob = moveKnob.current!
 
-    function setVec(dx: number, dy: number) {
+    function setMoveVec(dx: number, dy: number) {
       const len = Math.hypot(dx, dy)
       const clamped = Math.min(len, radius)
       const nx = len > 0 ? dx / len : 0
       const ny = len > 0 ? dy / len : 0
       knob.style.transform = `translate(${nx * clamped}px, ${ny * clamped}px)`
+      knob.style.opacity = "1"
       controls.moveX = (nx * clamped) / radius
-      // Invert Y: screen-down is positive in clientY, but game-forward is negative moveY
       controls.moveY = -(ny * clamped) / radius
     }
 
-    function reset() {
+    function resetMove() {
       knob.style.transform = "translate(0px, 0px)"
+      knob.style.opacity = "0.3"
       controls.moveX = 0
       controls.moveY = 0
-      activeId.current = null
+      moveActive.current = null
     }
 
-    function onDown(e: PointerEvent) {
-      if (activeId.current !== null) return
+    // ── Move zone (left half) ──
+    function onMoveDown(e: PointerEvent) {
+      if (moveActive.current !== null) return
       e.preventDefault()
       e.stopPropagation()
-      base.setPointerCapture(e.pointerId)
-      activeId.current = e.pointerId
-      const r = base.getBoundingClientRect()
-      center.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-      setVec(e.clientX - center.current.x, e.clientY - center.current.y)
+      moveEl.setPointerCapture(e.pointerId)
+      moveActive.current = e.pointerId
+      const r = moveEl.getBoundingClientRect()
+      moveCenter.current = { x: e.clientX, y: e.clientY }
+      // Position knob at touch point
+      knob.style.left = `${e.clientX - r.left}px`
+      knob.style.top = `${e.clientY - r.top}px`
+      knob.style.transform = "translate(-50%, -50%)"
+      knob.style.opacity = "0.6"
     }
 
-    function onMove(e: PointerEvent) {
-      if (e.pointerId !== activeId.current) return
+    function onMoveMove(e: PointerEvent) {
+      if (e.pointerId !== moveActive.current) return
       e.preventDefault()
-      setVec(e.clientX - center.current.x, e.clientY - center.current.y)
+      setMoveVec(e.clientX - moveCenter.current.x, e.clientY - moveCenter.current.y)
     }
 
-    function onUp(e: PointerEvent) {
-      if (e.pointerId !== activeId.current) return
+    function onMoveUp(e: PointerEvent) {
+      if (e.pointerId !== moveActive.current) return
       e.preventDefault()
-      try { base.releasePointerCapture(e.pointerId) } catch {}
-      reset()
+      try { moveEl.releasePointerCapture(e.pointerId) } catch {}
+      resetMove()
     }
 
-    base.addEventListener("pointerdown", onDown, { passive: false })
-    base.addEventListener("pointermove", onMove, { passive: false })
-    base.addEventListener("pointerup", onUp, { passive: false })
-    base.addEventListener("pointercancel", onUp, { passive: false })
-    base.addEventListener("lostpointercapture", () => reset())
+    // ── Look zone (right half) ──
+    function onLookDown(e: PointerEvent) {
+      if (lookActive.current !== null) return
+      // Don't capture if touching a HUD button
+      const target = e.target as HTMLElement
+      if (target.closest("[data-hud-control]")) return
+      lookActive.current = e.pointerId
+      lookLast.current = { x: e.clientX, y: e.clientY }
+    }
+
+    function onLookMove(e: PointerEvent) {
+      if (e.pointerId !== lookActive.current) return
+      const dx = e.clientX - lookLast.current.x
+      const dy = e.clientY - lookLast.current.y
+      controls.lookDX += dx * 1.5
+      controls.lookDY += dy * 1.5
+      lookLast.current = { x: e.clientX, y: e.clientY }
+    }
+
+    function onLookUp(e: PointerEvent) {
+      if (e.pointerId !== lookActive.current) return
+      lookActive.current = null
+    }
+
+    moveEl.addEventListener("pointerdown", onMoveDown, { passive: false })
+    moveEl.addEventListener("pointermove", onMoveMove, { passive: false })
+    moveEl.addEventListener("pointerup", onMoveUp, { passive: false })
+    moveEl.addEventListener("pointercancel", onMoveUp, { passive: false })
+    moveEl.addEventListener("lostpointercapture", () => resetMove())
+
+    lookEl.addEventListener("pointerdown", onLookDown)
+    window.addEventListener("pointermove", onLookMove)
+    window.addEventListener("pointerup", onLookUp)
+    window.addEventListener("pointercancel", onLookUp)
+
     return () => {
-      base.removeEventListener("pointerdown", onDown)
-      base.removeEventListener("pointermove", onMove)
-      base.removeEventListener("pointerup", onUp)
-      base.removeEventListener("pointercancel", onUp)
-      reset()
+      moveEl.removeEventListener("pointerdown", onMoveDown)
+      moveEl.removeEventListener("pointermove", onMoveMove)
+      moveEl.removeEventListener("pointerup", onMoveUp)
+      moveEl.removeEventListener("pointercancel", onMoveUp)
+      lookEl.removeEventListener("pointerdown", onLookDown)
+      window.removeEventListener("pointermove", onLookMove)
+      window.removeEventListener("pointerup", onLookUp)
+      window.removeEventListener("pointercancel", onLookUp)
+      resetMove()
     }
   }, [])
 
   return (
-    <div
-      ref={baseRef}
-      data-hud-control
-      className="absolute bottom-5 left-5 h-[88px] w-[88px] rounded-full z-30"
-      style={{ touchAction: "none", background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)", border: "1.5px solid rgba(255,255,255,0.08)" }}
-    >
-      <div className="absolute left-1/2 top-2 bottom-2 w-px bg-white/5 -translate-x-1/2" />
-      <div className="absolute top-1/2 left-2 right-2 h-px bg-white/5 -translate-y-1/2" />
+    <>
+      {/* Move zone — left half */}
       <div
-        ref={knobRef}
-        className="absolute left-1/2 top-1/2 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(168,85,247,0.3) 0%, rgba(168,85,247,0.1) 100%)", border: "1.5px solid rgba(168,85,247,0.4)", boxShadow: "0 0 12px rgba(168,85,247,0.2)" }}
-      />
-    </div>
+        ref={moveRef}
+        data-hud-control
+        className="absolute left-0 top-0 bottom-0 z-20"
+        style={{ width: "45%", touchAction: "none" }}
+      >
+        {/* Virtual joystick knob — appears where you touch */}
+        <div
+          ref={moveKnob}
+          className="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 rounded-full"
+          style={{
+            transform: "translate(-50%, -50%)",
+            opacity: 0.3,
+            background: "radial-gradient(circle, rgba(168,85,247,0.25) 0%, rgba(168,85,247,0.05) 70%, transparent 100%)",
+            border: "1.5px solid rgba(168,85,247,0.25)",
+            boxShadow: "0 0 20px rgba(168,85,247,0.1)",
+            transition: "opacity 0.15s",
+          }}
+        />
+        {/* Subtle zone indicator */}
+        <div className="absolute bottom-3 left-3 pointer-events-none">
+          <p className="font-mono text-[7px] tracking-[0.2em] text-white/10">MOVE</p>
+        </div>
+      </div>
+
+      {/* Look zone — right half */}
+      <div
+        ref={lookRef}
+        className="absolute right-0 top-0 bottom-0 z-10"
+        style={{ width: "55%", touchAction: "none" }}
+      >
+        <div className="absolute bottom-3 right-3 pointer-events-none">
+          <p className="font-mono text-[7px] tracking-[0.2em] text-white/10">LOOK</p>
+        </div>
+      </div>
+    </>
   )
-}
-
-// ─── Look Area (drag anywhere except HUD controls to look around) ───
-function LookArea() {
-  const activeId = useRef<number | null>(null)
-  const last = useRef({ x: 0, y: 0 })
-
-  useEffect(() => {
-    function onDown(e: PointerEvent) {
-      if (activeId.current !== null) return
-      // Ignore touches on HUD controls (joystick, buttons, buy menu, etc.)
-      const target = e.target as HTMLElement
-      if (target.closest("[data-hud-control]")) return
-      activeId.current = e.pointerId
-      last.current = { x: e.clientX, y: e.clientY }
-    }
-    function onMove(e: PointerEvent) {
-      if (e.pointerId !== activeId.current) return
-      const dx = e.clientX - last.current.x
-      const dy = e.clientY - last.current.y
-      controls.lookDX += dx * 1.5
-      controls.lookDY += dy * 1.5
-      last.current = { x: e.clientX, y: e.clientY }
-    }
-    function onUp(e: PointerEvent) {
-      if (e.pointerId !== activeId.current) return
-      activeId.current = null
-    }
-    // Listen on document so we catch ALL touches
-    document.addEventListener("pointerdown", onDown)
-    document.addEventListener("pointermove", onMove)
-    document.addEventListener("pointerup", onUp)
-    document.addEventListener("pointercancel", onUp)
-    return () => {
-      document.removeEventListener("pointerdown", onDown)
-      document.removeEventListener("pointermove", onMove)
-      document.removeEventListener("pointerup", onUp)
-      document.removeEventListener("pointercancel", onUp)
-    }
-  }, [])
-
-  return null
 }
 
 // ─── Action Button ───────────────────────────────────────────────────
@@ -190,13 +217,11 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<"weapons" | "gear">("weapons")
 
   if (hud.phase !== "buy") return null
-
   const canAfford = (price: number) => hud.money >= price
 
   return (
     <div data-hud-control className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-auto" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden rounded-2xl" style={{ background: "rgba(10,6,20,0.9)", border: "1px solid rgba(168,85,247,0.15)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" }}>
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
           <div>
             <p className="font-mono text-[10px] font-bold tracking-[0.25em] text-white/70">LOADOUT</p>
@@ -206,72 +231,29 @@ function BuyMenu({ onClose }: { onClose: () => void }) {
             <X className="size-5" />
           </button>
         </div>
-
-        {/* Tabs */}
         <div className="flex" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
           {(["weapons", "gear"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 font-mono text-[9px] font-bold tracking-[0.2em] transition-all ${
-                tab === t ? "text-white" : "text-white/30"
-              }`}
-              style={tab === t ? { borderBottom: "2px solid oklch(0.65 0.22 290)" } : {}}
-            >
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2.5 font-mono text-[9px] font-bold tracking-[0.2em] transition-all ${tab === t ? "text-white" : "text-white/30"}`} style={tab === t ? { borderBottom: "2px solid oklch(0.65 0.22 290)" } : {}}>
               {t === "weapons" ? "WEAPONS" : "GEAR"}
             </button>
           ))}
         </div>
-
-        {/* Items */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {tab === "weapons" &&
-            (Object.values(WEAPONS) as typeof WEAPONS.pistol[]).map((w) => (
-              <button
-                key={w.id}
-                onClick={() => { engine.buyWeapon(w.id as any) }}
-                disabled={!canAfford(w.price)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${
-                  canAfford(w.price) ? "bg-white/[0.04]" : "opacity-25"
-                }`}
-              >
-                <div>
-                  <p className="font-mono text-[11px] font-bold tracking-wide text-white/90">{w.name}</p>
-                  <p className="font-mono text-[8px] tracking-wider text-white/30 mt-0.5">
-                    DMG {w.damage} · RNG {w.range} · {w.auto ? "AUTO" : "SEMI"}
-                  </p>
-                </div>
-                <span className={`font-mono text-[11px] font-bold ${canAfford(w.price) ? "text-accent" : "text-white/20"}`}>
-                  ${w.price}
-                </span>
-              </button>
-            ))}
-          {tab === "gear" &&
-            (Object.values(GEAR) as typeof GEAR.shield_light[]).filter(g => g.id !== 'bomb').map((g) => (
-              <button
-                key={g.id}
-                onClick={() => { engine.buyGear(g.id as any) }}
-                disabled={!canAfford(g.price)}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${
-                  canAfford(g.price) ? "bg-white/[0.04]" : "opacity-25"
-                }`}
-              >
-                <div>
-                  <p className="font-mono text-[11px] font-bold tracking-wide text-white/90">{g.name}</p>
-                  <p className="font-mono text-[8px] tracking-wider text-white/30 mt-0.5">{g.description}</p>
-                </div>
-                <span className={`font-mono text-[11px] font-bold ${canAfford(g.price) ? "text-accent" : "text-white/20"}`}>
-                  ${g.price}
-                </span>
-              </button>
-            ))}
+          {tab === "weapons" && (Object.values(WEAPONS) as typeof WEAPONS.pistol[]).map((w) => (
+            <button key={w.id} onClick={() => engine.buyWeapon(w.id as any)} disabled={!canAfford(w.price)} className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${canAfford(w.price) ? "bg-white/[0.04]" : "opacity-25"}`}>
+              <div><p className="font-mono text-[11px] font-bold tracking-wide text-white/90">{w.name}</p><p className="font-mono text-[8px] tracking-wider text-white/30 mt-0.5">DMG {w.damage} · RNG {w.range} · {w.auto ? "AUTO" : "SEMI"}</p></div>
+              <span className={`font-mono text-[11px] font-bold ${canAfford(w.price) ? "text-accent" : "text-white/20"}`}>${w.price}</span>
+            </button>
+          ))}
+          {tab === "gear" && (Object.values(GEAR) as typeof GEAR.shield_light[]).filter(g => g.id !== 'bomb').map((g) => (
+            <button key={g.id} onClick={() => engine.buyGear(g.id as any)} disabled={!canAfford(g.price)} className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition-all active:scale-[0.98] active:bg-white/10 ${canAfford(g.price) ? "bg-white/[0.04]" : "opacity-25"}`}>
+              <div><p className="font-mono text-[11px] font-bold tracking-wide text-white/90">{g.name}</p><p className="font-mono text-[8px] tracking-wider text-white/30 mt-0.5">{g.description}</p></div>
+              <span className={`font-mono text-[11px] font-bold ${canAfford(g.price) ? "text-accent" : "text-white/20"}`}>${g.price}</span>
+            </button>
+          ))}
         </div>
-
-        {/* Timer */}
         <div className="px-4 py-2 text-center" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <p className="font-mono text-[9px] tracking-[0.2em] text-white/30">
-            PREP PHASE · <span className="text-accent font-bold">{hud.timer}s</span>
-          </p>
+          <p className="font-mono text-[9px] tracking-[0.2em] text-white/30">PREP PHASE · <span className="text-accent font-bold">{hud.timer}s</span></p>
         </div>
       </div>
     </div>
@@ -283,24 +265,14 @@ function MatchEndScreen({ onExit }: { onExit: () => void }) {
   const hud = useHud()
   if (hud.phase !== "matchend") return null
   const won = hud.matchWinner === "A"
-
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-auto">
       <div className="absolute inset-0" style={{ background: "rgba(10,6,20,0.8)", backdropFilter: "blur(16px)" }} />
       <div className="relative w-full max-w-xs mx-4 rounded-2xl p-8 text-center" style={{ background: "rgba(10,6,20,0.9)", border: `1px solid ${won ? "rgba(168,85,247,0.3)" : "rgba(34,211,238,0.3)"}`, boxShadow: `0 0 40px ${won ? "rgba(168,85,247,0.15)" : "rgba(34,211,238,0.15)"}` }}>
         <p className="font-mono text-[9px] tracking-[0.3em] text-white/40 mb-3">MATCH OVER</p>
-        <p className="font-mono text-3xl font-black tracking-[0.15em] mb-1" style={{ color: won ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 20px ${won ? "rgba(168,85,247,0.5)" : "rgba(34,211,238,0.5)"}` }}>
-          {won ? "VICTORY" : "DEFEAT"}
-        </p>
+        <p className="font-mono text-3xl font-black tracking-[0.15em] mb-1" style={{ color: won ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 20px ${won ? "rgba(168,85,247,0.5)" : "rgba(34,211,238,0.5)"}` }}>{won ? "VICTORY" : "DEFEAT"}</p>
         <p className="font-mono text-xs text-white/40 mb-6">{hud.scoreA} — {hud.scoreB}</p>
-        <button
-          data-hud-control
-          onClick={onExit}
-          className="w-full rounded-xl py-3 font-mono text-[10px] font-bold tracking-[0.2em] text-white active:scale-[0.98] transition-transform"
-          style={{ background: "oklch(0.65 0.22 290 / 80%)", boxShadow: "0 0 20px rgba(168,85,247,0.3)" }}
-        >
-          RETURN TO LOBBY
-        </button>
+        <button data-hud-control onClick={onExit} className="w-full rounded-xl py-3 font-mono text-[10px] font-bold tracking-[0.2em] text-white active:scale-[0.98] transition-transform" style={{ background: "oklch(0.65 0.22 290 / 80%)", boxShadow: "0 0 20px rgba(168,85,247,0.3)" }}>RETURN TO LOBBY</button>
       </div>
     </div>
   )
@@ -314,10 +286,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
   const weapon = WEAPONS[hud.weaponId]
   const [showBuy, setShowBuy] = useState(false)
 
-  // Request fullscreen on mount
-  useEffect(() => {
-    requestFullscreen()
-  }, [])
+  useEffect(() => { requestFullscreen() }, [])
 
   const handleExit = useCallback(() => {
     try { if (document.fullscreenElement) document.exitFullscreen() } catch {}
@@ -331,15 +300,13 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden font-mono text-white">
-      {/* Look area — no DOM element, uses document listeners */}
-      <LookArea />
+      {/* Touch controls — dual zone */}
+      <TouchControls />
 
       {/* Damage vignette */}
-      {showDamage && (
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(239,68,68,0.25) 100%)" }} />
-      )}
+      {showDamage && <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, transparent 40%, rgba(239,68,68,0.25) 100%)" }} />}
 
-      {/* ── Score pill ── */}
+      {/* Score pill */}
       <div className="absolute left-1/2 top-2 -translate-x-1/2 pointer-events-none">
         <div className="flex items-center gap-2 rounded-full px-4 py-1" style={{ background: "rgba(10,6,20,0.6)", border: "1px solid rgba(255,255,255,0.06)", backdropFilter: "blur(12px)" }}>
           <span className="text-sm font-black tabular-nums" style={{ color: "oklch(0.65 0.22 290)", textShadow: "0 0 8px rgba(168,85,247,0.4)" }}>{hud.scoreA}</span>
@@ -351,35 +318,26 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       </div>
 
-      {/* ── Buy phase button ── */}
+      {/* Buy phase button */}
       {hud.phase === "buy" && !showBuy && (
         <div className="absolute left-1/2 top-11 -translate-x-1/2 pointer-events-auto z-30">
-          <button
-            data-hud-control
-            onClick={() => setShowBuy(true)}
-            className="rounded-full px-5 py-2 active:scale-95 transition-transform"
-            style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)", boxShadow: "0 0 16px rgba(34,211,238,0.15)" }}
-          >
-            <span className="font-mono text-[10px] font-bold tracking-[0.2em]" style={{ color: "oklch(0.72 0.14 195)" }}>
-              SHOP · {hud.timer}s
-            </span>
+          <button data-hud-control onClick={() => setShowBuy(true)} className="rounded-full px-5 py-2 active:scale-95 transition-transform" style={{ background: "rgba(34,211,238,0.1)", border: "1px solid rgba(34,211,238,0.25)", boxShadow: "0 0 16px rgba(34,211,238,0.15)" }}>
+            <span className="font-mono text-[10px] font-bold tracking-[0.2em]" style={{ color: "oklch(0.72 0.14 195)" }}>SHOP · {hud.timer}s</span>
           </button>
         </div>
       )}
 
-      {/* ── Round result ── */}
+      {/* Round result */}
       {hud.phase === "roundend" && hud.roundResult && (
         <div className="absolute left-1/2 top-1/3 -translate-x-1/2 pointer-events-none">
           <div className="rounded-2xl px-8 py-5 text-center" style={{ background: "rgba(10,6,20,0.8)", border: `1px solid ${hud.roundResult === "A" ? "rgba(168,85,247,0.2)" : "rgba(34,211,238,0.2)"}`, backdropFilter: "blur(20px)" }}>
-            <p className="text-lg font-black tracking-[0.15em]" style={{ color: hud.roundResult === "A" ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 16px ${hud.roundResult === "A" ? "rgba(168,85,247,0.4)" : "rgba(34,211,238,0.4)"}` }}>
-              {hud.roundResult === "A" ? "PURPLE" : "CYAN"} WINS
-            </p>
+            <p className="text-lg font-black tracking-[0.15em]" style={{ color: hud.roundResult === "A" ? "oklch(0.65 0.22 290)" : "oklch(0.72 0.14 195)", textShadow: `0 0 16px ${hud.roundResult === "A" ? "rgba(168,85,247,0.4)" : "rgba(34,211,238,0.4)"}` }}>{hud.roundResult === "A" ? "PURPLE" : "CYAN"} WINS</p>
             <p className="text-[9px] tracking-[0.2em] text-white/30 mt-1">ROUND {hud.roundNum}</p>
           </div>
         </div>
       )}
 
-      {/* ── Killfeed ── */}
+      {/* Killfeed */}
       <div className="absolute right-2 top-2 flex flex-col items-end gap-1 pointer-events-none">
         {hud.killfeed.map((k) => (
           <div key={k.id} className="rounded-lg px-2.5 py-1 text-[8px]" style={{ background: "rgba(10,6,20,0.5)", border: "1px solid rgba(255,255,255,0.04)" }}>
@@ -390,7 +348,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         ))}
       </div>
 
-      {/* ── Alive count ── */}
+      {/* Alive count */}
       <div className="absolute right-2 top-12 pointer-events-none">
         <div className="flex items-center gap-1.5 rounded-lg px-2 py-1" style={{ background: "rgba(10,6,20,0.5)", border: "1px solid rgba(255,255,255,0.04)" }}>
           <span className="text-[9px] font-bold" style={{ color: "oklch(0.65 0.22 290)" }}>{hud.aliveA}</span>
@@ -399,7 +357,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       </div>
 
-      {/* ── Crosshair ── */}
+      {/* Crosshair */}
       {hud.alive && hud.phase !== "roundend" && (
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -412,36 +370,24 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       )}
 
-      {/* ── Joystick ── */}
-      <div className="pointer-events-auto z-30">
-        <Joystick />
-      </div>
-
-      {/* ── Health ── */}
-      <div className="absolute bottom-[100px] left-5 w-[88px] pointer-events-none z-30">
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+      {/* Health (bottom left) */}
+      <div className="absolute bottom-4 left-4 w-24 pointer-events-none z-30">
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
           <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${hpPct}%`, background: hpColor, boxShadow: `0 0 6px ${hpColor}` }} />
         </div>
         {hud.shield > 0 && (
-          <div className="h-0.5 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.04)" }}>
+          <div className="h-1 rounded-full overflow-hidden mt-1" style={{ background: "rgba(255,255,255,0.04)" }}>
             <div className="h-full rounded-full transition-[width] duration-100" style={{ width: `${shieldPct}%`, background: "oklch(0.72 0.14 195 / 60%)" }} />
           </div>
         )}
-        <p className="mt-0.5 text-[8px] text-white/30 tabular-nums tracking-wider">
+        <p className="mt-0.5 text-[9px] text-white/30 tabular-nums tracking-wider">
           {Math.ceil(hud.health)}{hud.shield > 0 && <span className="text-accent/60"> +{Math.ceil(hud.shield)}</span>}
         </p>
       </div>
 
-      {/* ── Action buttons ── */}
+      {/* Action buttons (bottom right) */}
       <div className="pointer-events-auto absolute bottom-5 right-5 flex flex-col items-end gap-2.5 z-30">
-        <ActionBtn
-          label="FIRE"
-          size="lg"
-          glow="0 0 16px rgba(168,85,247,0.2), inset 0 0 12px rgba(168,85,247,0.08)"
-          className="!border-purple-500/25 text-purple-300"
-          onDown={() => (controls.firing = true)}
-          onUp={() => (controls.firing = false)}
-        />
+        <ActionBtn label="FIRE" size="lg" glow="0 0 16px rgba(168,85,247,0.2), inset 0 0 12px rgba(168,85,247,0.08)" className="!border-purple-500/25 text-purple-300" onDown={() => (controls.firing = true)} onUp={() => (controls.firing = false)} />
         <div className="flex gap-2">
           <ActionBtn label="JMP" size="sm" onDown={() => (controls.jumpQueued = true)} className="text-white/50" />
           <ActionBtn label="RLD" size="sm" onDown={() => (controls.reloadQueued = true)} className="text-white/50" />
@@ -449,7 +395,7 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       </div>
 
-      {/* ── Ammo ── */}
+      {/* Ammo (bottom center) */}
       <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
         <div className="rounded-xl px-4 py-1.5 text-center" style={{ background: "rgba(10,6,20,0.5)", border: "1px solid rgba(255,255,255,0.04)", backdropFilter: "blur(8px)" }}>
           <div className="flex items-baseline justify-center gap-0.5">
@@ -457,13 +403,12 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
             <span className="text-[9px] text-white/25 tabular-nums">/ {hud.reserve}</span>
           </div>
           <p className="text-[7px] tracking-[0.2em] text-white/25 uppercase mt-0.5">
-            {weapon.name}
-            {hud.reloading && <span className="ml-1 text-accent/60 animate-pulse">···</span>}
+            {weapon.name}{hud.reloading && <span className="ml-1 text-accent/60 animate-pulse">···</span>}
           </p>
         </div>
       </div>
 
-      {/* ── Death overlay ── */}
+      {/* Death overlay */}
       {!hud.alive && hud.phase === "live" && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
@@ -473,10 +418,8 @@ export function GameHud({ onExit }: { onExit?: () => void }) {
         </div>
       )}
 
-      {/* ── Buy Menu ── */}
+      {/* Buy Menu */}
       {showBuy && <BuyMenu onClose={() => setShowBuy(false)} />}
-
-      {/* ── Match End ── */}
       <MatchEndScreen onExit={handleExit} />
     </div>
   )

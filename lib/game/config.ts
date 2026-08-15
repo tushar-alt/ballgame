@@ -245,11 +245,11 @@ export const GEAR: Record<GearId, Gear> = {
 
 // Ekonomi
 export const ECONOMY = {
-  startMoney: 800,
+  startMoney: 1200,
   maxMoney: 9000,
-  winReward: 3000,
-  lossReward: 1900,
-  killReward: 300,
+  winReward: 3500,
+  lossReward: 2400,
+  killReward: 500,
   bombPlantReward: 300,
   bombDefuseReward: 600,
   bombExplodeReward: 500,
@@ -270,9 +270,9 @@ export const ROUND = {
 }
 
 export const PLAYER = {
-  maxHealth: 100,
+  maxHealth: 150,
   maxShield: 100,
-  moveSpeed: 5.2,
+  moveSpeed: 5.5,
   sprintSpeed: 7,
   jumpForce: 5.2,
   eyeHeight: 1.55,

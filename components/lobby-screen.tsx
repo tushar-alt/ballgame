@@ -123,7 +123,7 @@ export function LobbyScreen({
       localColor: '#8b5cf6',
       localTeam: 'A',
       humans: [{ id: userId, name: profile.username, color: '#8b5cf6', team: 'A' }],
-      botsPerTeam: 3,
+      botsPerTeam: 2,
       onMatchEnd: () => {},
     })
     onStart(engine)

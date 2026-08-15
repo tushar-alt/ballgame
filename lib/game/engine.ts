@@ -605,7 +605,7 @@ export class GameEngine {
         const tgtZ = bot.team === 'A' ? this.map.half * 0.4 : -this.map.half * 0.4
         bot.wander.set((Math.random() - 0.5) * this.map.half, 0, tgtZ + (Math.random() - 0.5) * 8)
       }
-      bot.aimError.set((Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.06)
+      bot.aimError.set((Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.15)
     }
 
     if (this.phase !== 'live') return
