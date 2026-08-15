@@ -83,31 +83,13 @@ export function LobbyScreen({
 
     const channel = supabase
       .channel(`lobby:${lobby.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobby.id}` },
-        () => loadMembers(),
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'lobby_messages', filter: `lobby_id=eq.${lobby.id}` },
-        (payload) => setMessages((prev) => [...prev, payload.new as LobbyMessage]),
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobby.id}` },
-        (payload) => setLobby(payload.new as Lobby),
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobby.id}` },
-        () => onLeave(),
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lobby_members', filter: `lobby_id=eq.${lobby.id}` }, () => loadMembers())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lobby_messages', filter: `lobby_id=eq.${lobby.id}` }, (payload) => setMessages((prev) => [...prev, payload.new as LobbyMessage]))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobby.id}` }, (payload) => setLobby(payload.new as Lobby))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'lobbies', filter: `id=eq.${lobby.id}` }, () => onLeave())
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [lobby.id, loadMembers, loadMessages, onLeave])
 
   useEffect(() => {
@@ -129,26 +111,21 @@ export function LobbyScreen({
 
   async function handleStart() {
     if (!userId || !profile || !onStart) return
-
     const supabase = getSupabaseBrowser()
     if (supabase) {
       await supabase.from('lobbies').update({ status: 'in_game' }).eq('id', lobby.id)
       setLobby((prev) => ({ ...prev, status: 'in_game' }))
     }
-
     const engine = new GameEngine({
       mapId: lobby.map,
       localId: userId,
       localName: profile.username,
       localColor: '#8b5cf6',
       localTeam: 'A',
-      humans: [
-        { id: userId, name: profile.username, color: '#8b5cf6', team: 'A' },
-      ],
+      humans: [{ id: userId, name: profile.username, color: '#8b5cf6', team: 'A' }],
       botsPerTeam: 3,
       onMatchEnd: () => {},
     })
-
     onStart(engine)
   }
 
@@ -162,69 +139,73 @@ export function LobbyScreen({
   const teamB = members.filter((m) => m.team === 'B')
   const myTeam = members.find((m) => m.user_id === userId)?.team
   const currentMap = GAME_MAPS.find((m) => m.id === lobby.map) ?? GAME_MAPS[0]
-  const canStart = members.length >= 1 // deneme amaçlı tek oyuncuya da izin
+  const canStart = members.length >= 1
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-4 py-3 backdrop-blur">
-        <button onClick={handleLeave} className="rounded-xl border border-border bg-card/60 p-2 active:scale-95" aria-label="Ayrıl">
-          <ArrowLeft className="size-4" />
-        </button>
-        <button
-          onClick={copyCode}
-          className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 border-glow-purple"
-        >
-          <span className="font-mono text-lg font-black tracking-[0.3em] text-glow-purple">{lobby.code}</span>
-          {copied ? <Check className="size-4 text-accent" /> : <Copy className="size-4 text-muted-foreground" />}
-        </button>
-        <div className="flex items-center gap-1 rounded-xl border border-border bg-card/60 px-3 py-2 text-xs text-muted-foreground">
-          <Users className="size-3.5" /> {members.length}
+      {/* Header */}
+      <header className="sticky top-0 z-10 glass-strong px-4 py-3 safe-top">
+        <div className="flex items-center justify-between">
+          <button onClick={handleLeave} className="rounded-xl glass p-2.5 text-muted-foreground active:scale-95 transition-all">
+            <ArrowLeft className="size-4" />
+          </button>
+
+          <button
+            onClick={copyCode}
+            className="flex items-center gap-2 glass rounded-xl px-4 py-2.5 border-glow-purple transition-all active:scale-95"
+          >
+            <span className="font-mono text-base font-black tracking-[0.3em] text-primary">{lobby.code}</span>
+            {copied ? <Check className="size-3.5 text-accent" /> : <Copy className="size-3.5 text-muted-foreground" />}
+          </button>
+
+          <div className="flex items-center gap-1.5 glass rounded-xl px-3 py-2.5">
+            <Users className="size-3.5 text-muted-foreground" />
+            <span className="font-mono text-xs font-bold tabular-nums">{members.length}</span>
+          </div>
         </div>
       </header>
 
-      {/* pane switch (mobile) */}
-      <div className="grid grid-cols-2 gap-1 border-b border-border bg-background/60 p-2">
-        <button
-          onClick={() => setPane('lobby')}
-          className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-mono text-xs font-bold tracking-wider ${
-            pane === 'lobby' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
-          }`}
-        >
-          <Users className="size-3.5" /> LOBİ
-        </button>
-        <button
-          onClick={() => setPane('chat')}
-          className={`flex items-center justify-center gap-1.5 rounded-lg py-2 font-mono text-xs font-bold tracking-wider ${
-            pane === 'chat' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'
-          }`}
-        >
-          <MessageSquare className="size-3.5" /> CHAT
-        </button>
+      {/* Tab switch */}
+      <div className="grid grid-cols-2 gap-1 p-3">
+        {(['lobby', 'chat'] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPane(p)}
+            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-mono text-[10px] font-bold tracking-[0.15em] transition-all ${
+              pane === p
+                ? p === 'lobby' ? 'bg-primary/90 text-primary-foreground' : 'bg-accent/90 text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {p === 'lobby' ? <Users className="size-3.5" /> : <MessageSquare className="size-3.5" />}
+            {p === 'lobby' ? 'LOBBY' : 'CHAT'}
+          </button>
+        ))}
       </div>
 
       {pane === 'lobby' ? (
-        <div className="flex-1 px-4 py-4">
-          {/* Map */}
-          <div className="mb-4 rounded-xl border border-primary/30 bg-card/60 p-3">
+        <div className="flex-1 px-4 pb-4">
+          {/* Map card */}
+          <div className="mb-4 glass rounded-xl p-4 border-glow-purple">
             <div className="flex items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
                 <Crosshair className="size-5" />
               </div>
               <div>
-                <p className="text-[0.6rem] tracking-widest text-muted-foreground">HARİTA</p>
-                <p className="font-mono text-sm font-bold">{currentMap.name}</p>
+                <p className="font-mono text-[8px] tracking-[0.25em] text-muted-foreground">MAP</p>
+                <p className="font-mono text-sm font-bold tracking-[0.05em]">{currentMap.name}</p>
               </div>
             </div>
             {isHost && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
                 {GAME_MAPS.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setLobbyMap(lobby.id, m.id)}
-                    className={`rounded-lg border px-2 py-2 font-mono text-[0.6rem] font-bold tracking-wider transition-all ${
+                    className={`rounded-lg px-2 py-2 font-mono text-[9px] font-bold tracking-[0.1em] transition-all active:scale-95 ${
                       lobby.map === m.id
-                        ? 'border-primary bg-primary/20 text-primary'
-                        : 'border-border text-muted-foreground'
+                        ? 'bg-primary/20 text-primary border border-primary/30'
+                        : 'bg-white/5 text-muted-foreground border border-transparent'
                     }`}
                   >
                     {m.name}
@@ -235,75 +216,59 @@ export function LobbyScreen({
           </div>
 
           {/* Teams */}
-          <div className="grid grid-cols-2 gap-3">
-            <TeamColumn
-              title="TAKIM MOR"
-              accent="purple"
-              members={teamA}
-              hostId={lobby.host_id}
-              onJoin={myTeam !== 'A' ? () => userId && setMemberTeam(userId, lobby.id, 'A') : undefined}
-            />
-            <TeamColumn
-              title="TAKIM CYAN"
-              accent="cyan"
-              members={teamB}
-              hostId={lobby.host_id}
-              onJoin={myTeam !== 'B' ? () => userId && setMemberTeam(userId, lobby.id, 'B') : undefined}
-            />
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <TeamColumn title="PURPLE" accent="purple" members={teamA} hostId={lobby.host_id}
+              onJoin={myTeam !== 'A' ? () => userId && setMemberTeam(userId, lobby.id, 'A') : undefined} />
+            <TeamColumn title="CYAN" accent="cyan" members={teamB} hostId={lobby.host_id}
+              onJoin={myTeam !== 'B' ? () => userId && setMemberTeam(userId, lobby.id, 'B') : undefined} />
           </div>
 
-          {/* Invite friends */}
+          {/* Friends invite */}
           <button
             onClick={() => setShowFriends((s) => !s)}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 py-2.5 font-mono text-xs font-bold tracking-wider text-accent"
+            className="mb-3 flex w-full items-center justify-center gap-2 glass rounded-xl py-2.5 font-mono text-[10px] font-bold tracking-[0.15em] text-accent active:scale-[0.98] transition-all"
           >
-            <Send className="size-4" /> ARKADAŞ DAVET ET
+            <Send className="size-3.5" /> INVITE FRIENDS
           </button>
           {showFriends && userId && (
-            <div className="mt-3 rounded-xl border border-border bg-card/60 p-3">
+            <div className="mb-4 glass rounded-xl p-3">
               <FriendsPanel
                 userId={userId}
                 canInvite
-                onInvite={(f) => {
-                  if (userId) sendGameInvite(userId, f.profile.id, lobby.id)
-                }}
+                onInvite={(f) => { if (userId) sendGameInvite(userId, f.profile.id, lobby.id) }}
               />
             </div>
           )}
 
+          {/* Start button */}
           {isHost && (
             <button
               onClick={handleStart}
               disabled={!canStart}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 font-mono text-sm font-black tracking-widest text-primary-foreground border-glow-purple active:scale-[0.98] disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/90 py-4 font-mono text-xs font-black tracking-[0.2em] text-primary-foreground active:scale-[0.98] disabled:opacity-40 transition-all"
             >
-              <Play className="size-4" /> MAÇI BAŞLAT
+              <Play className="size-4" /> START MATCH
             </button>
           )}
-          <p className="mt-3 text-center text-[0.65rem] text-muted-foreground">
-            {isHost
-              ? 'Oyun çekirdeği bir sonraki aşamada geliyor. Şimdilik lobi ve chat aktif.'
-              : 'Kurucunun maçı başlatmasını bekleyin.'}
-          </p>
         </div>
       ) : (
         <div className="flex flex-1 flex-col">
-          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
             {messages.length === 0 && (
-              <p className="mt-8 text-center text-xs text-muted-foreground">Henüz mesaj yok. İlk mesajı sen yaz.</p>
+              <p className="mt-12 text-center font-mono text-[10px] text-muted-foreground/50">No messages yet</p>
             )}
             {messages.map((m) => {
               const mine = m.user_id === userId
               return (
                 <div key={m.id} className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-                  <span className="mb-0.5 px-1 font-mono text-[0.6rem] tracking-wider text-muted-foreground">
+                  <span className="mb-0.5 px-1 font-mono text-[8px] tracking-wider text-muted-foreground/60">
                     {m.username}
                   </span>
                   <span
-                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
+                    className={`max-w-[80%] rounded-2xl px-3 py-2 text-[12px] ${
                       mine
-                        ? 'bg-primary text-primary-foreground'
-                        : 'border border-border bg-card text-card-foreground'
+                        ? 'bg-primary/90 text-primary-foreground'
+                        : 'glass'
                     }`}
                   >
                     {m.content}
@@ -313,18 +278,17 @@ export function LobbyScreen({
             })}
             <div ref={chatEndRef} />
           </div>
-          <form onSubmit={handleSend} className="flex gap-2 border-t border-border bg-background/80 p-3">
+          <form onSubmit={handleSend} className="flex gap-2 glass-strong p-3 safe-bottom">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Mesaj yaz..."
-              className="flex-1 rounded-xl border border-border bg-background/60 px-3 py-2.5 text-sm outline-none focus:border-accent"
+              placeholder="Type a message..."
+              className="flex-1 rounded-xl glass px-3 py-2.5 text-sm outline-none focus:border-accent/40 transition-colors placeholder:text-muted-foreground/40"
             />
             <button
               type="submit"
               disabled={!input.trim()}
-              className="rounded-xl bg-accent px-4 text-accent-foreground border-glow-cyan disabled:opacity-50"
-              aria-label="Gönder"
+              className="rounded-xl bg-accent/90 px-4 text-accent-foreground active:scale-95 disabled:opacity-30 transition-all"
             >
               <Send className="size-4" />
             </button>
@@ -349,49 +313,34 @@ function TeamColumn({
   onJoin?: () => void
 }) {
   return (
-    <div
-      className={`flex flex-col rounded-xl border bg-card/40 p-3 ${
-        accent === 'purple' ? 'border-primary/40' : 'border-accent/40'
-      }`}
-    >
-      <p
-        className={`mb-2 font-mono text-[0.65rem] font-bold tracking-widest ${
-          accent === 'purple' ? 'text-primary' : 'text-accent'
-        }`}
-      >
+    <div className={`flex flex-col glass rounded-xl p-3 ${accent === 'purple' ? 'border-glow-purple' : 'border-glow-cyan'}`}>
+      <p className={`mb-2 font-mono text-[9px] font-bold tracking-[0.2em] ${accent === 'purple' ? 'text-primary' : 'text-accent'}`}>
         {title}
       </p>
       <ul className="flex flex-1 flex-col gap-1.5">
         {members.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center gap-1.5 rounded-lg bg-background/50 px-2 py-1.5 text-xs"
-          >
-            <span
-              className={`size-1.5 rounded-full ${accent === 'purple' ? 'bg-primary' : 'bg-accent'}`}
-            />
-            <span className="truncate">{m.profile?.username ?? '...'}</span>
+          <li key={m.id} className="flex items-center gap-2 rounded-lg bg-white/5 px-2.5 py-2 text-[11px]">
+            <span className={`size-1.5 rounded-full ${accent === 'purple' ? 'bg-primary' : 'bg-accent'}`} />
+            <span className="truncate font-medium">{m.profile?.username ?? '...'}</span>
             {m.user_id === hostId && (
-              <span className="ml-auto font-mono text-[0.5rem] tracking-wider text-muted-foreground">
-                HOST
-              </span>
+              <span className="ml-auto font-mono text-[7px] tracking-[0.15em] text-muted-foreground">HOST</span>
             )}
           </li>
         ))}
         {members.length === 0 && (
-          <li className="rounded-lg border border-dashed border-border px-2 py-3 text-center text-[0.65rem] text-muted-foreground">
-            Boş
+          <li className="rounded-lg border border-dashed border-white/10 px-2 py-3 text-center font-mono text-[9px] text-muted-foreground/40">
+            Empty
           </li>
         )}
       </ul>
       {onJoin && (
         <button
           onClick={onJoin}
-          className={`mt-2 rounded-lg py-1.5 font-mono text-[0.6rem] font-bold tracking-wider ${
-            accent === 'purple' ? 'bg-primary/20 text-primary' : 'bg-accent/20 text-accent'
+          className={`mt-2 rounded-lg py-2 font-mono text-[9px] font-bold tracking-[0.15em] active:scale-95 transition-all ${
+            accent === 'purple' ? 'bg-primary/15 text-primary' : 'bg-accent/15 text-accent'
           }`}
         >
-          KATIL
+          JOIN
         </button>
       )}
     </div>

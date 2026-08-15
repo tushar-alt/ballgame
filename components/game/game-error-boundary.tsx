@@ -1,6 +1,7 @@
 'use client'
 
 import { Component, type ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
 type Props = {
   children: ReactNode
@@ -31,24 +32,22 @@ export class GameErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-dvh w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
-          <div className="flex size-16 items-center justify-center rounded-2xl border border-red-500/40 bg-red-500/10">
-            <svg className="size-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
+        <div className="flex h-dvh w-full flex-col items-center justify-center gap-5 bg-background px-6 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl glass border border-destructive/20">
+            <AlertTriangle className="size-6 text-destructive" />
           </div>
           <div>
-            <p className="font-mono text-lg font-bold text-red-400">OYUN HATASI</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
-              3D motor beklenmeyen bir hatayla karşılaştı.
+            <p className="font-mono text-sm font-bold tracking-[0.15em] text-foreground">ENGINE ERROR</p>
+            <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+              The 3D engine encountered an unexpected issue.
             </p>
           </div>
           {this.state.error && (
-            <details className="w-full max-w-sm rounded-lg border border-border bg-card/60 p-3">
-              <summary className="cursor-pointer font-mono text-[0.65rem] text-muted-foreground">
-                Hata detayı
+            <details className="w-full max-w-sm glass rounded-xl p-3">
+              <summary className="cursor-pointer font-mono text-[9px] tracking-wider text-muted-foreground">
+                Error details
               </summary>
-              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[0.6rem] text-red-300/80">
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[9px] text-destructive/70">
                 {this.state.error.message}
               </pre>
             </details>
@@ -56,15 +55,15 @@ export class GameErrorBoundary extends Component<Props, State> {
           <div className="flex gap-3">
             <button
               onClick={this.handleRetry}
-              className="rounded-xl bg-primary px-5 py-2.5 font-mono text-xs font-bold tracking-wider text-primary-foreground border-glow-purple active:scale-95"
+              className="rounded-xl bg-primary/90 px-6 py-3 font-mono text-[10px] font-bold tracking-[0.2em] text-primary-foreground active:scale-95 transition-transform"
             >
-              TEKRAR DENE
+              RETRY
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="rounded-xl border border-border bg-card/60 px-5 py-2.5 font-mono text-xs font-bold tracking-wider text-muted-foreground active:scale-95"
+              className="rounded-xl glass px-6 py-3 font-mono text-[10px] font-bold tracking-[0.2em] text-muted-foreground active:scale-95 transition-transform"
             >
-              SAYFAYI YENİLE
+              RELOAD
             </button>
           </div>
         </div>
