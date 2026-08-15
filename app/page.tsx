@@ -10,6 +10,7 @@ import { MainMenu } from '@/components/main-menu'
 import { LobbyScreen } from '@/components/lobby-screen'
 import { GameHud } from '@/components/game/game-hud'
 import { GameErrorBoundary } from '@/components/game/game-error-boundary'
+import { GameContext } from '@/components/game/game-context'
 import { GameEngine } from '@/lib/game/engine'
 import type { Lobby } from '@/lib/types'
 import { Loader2 } from 'lucide-react'
@@ -34,10 +35,12 @@ function MatchScreen({ engine, onClose }: { engine: GameEngine; onClose: () => v
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
       <GameErrorBoundary onRetry={onClose}>
-        <Suspense fallback={<GameLoadingScreen />}>
-          <GameCanvas engine={engine} />
-        </Suspense>
-        <GameHud />
+        <GameContext.Provider value={engine}>
+          <Suspense fallback={<GameLoadingScreen />}>
+            <GameCanvas engine={engine} />
+          </Suspense>
+          <GameHud />
+        </GameContext.Provider>
       </GameErrorBoundary>
       <button
         onClick={onClose}
