@@ -382,7 +382,7 @@ export class GameEngine {
     if (!target.alive) return
     let remaining = dmg
     if (target.shield > 0) {
-      const absorbed = Math.min(target.shield, remaining * 0.6)
+      const absorbed = Math.min(target.shield, remaining)
       target.shield -= absorbed
       remaining -= absorbed
     }
@@ -611,6 +611,15 @@ export class GameEngine {
     if (this.phase !== 'live') return
 
     const w = WEAPONS[bot.weapon]
+
+    // bot reload completion
+    if (now >= bot.reloadUntil && bot.ammo <= 0 && bot.reserve > 0) {
+      const need = w.magazine - bot.ammo
+      const take = Math.min(need, bot.reserve)
+      bot.reserve -= take
+      bot.ammo += take
+    }
+
     const target = bot.targetId ? this.combatants.get(bot.targetId) : null
     const eye = bot.pos.clone()
     eye.y += PLAYER.eyeHeight
@@ -638,10 +647,6 @@ export class GameEngine {
       ) {
         if (bot.ammo <= 0) {
           bot.reloadUntil = now + w.reloadTime
-          const need = w.magazine - bot.ammo
-          const take = Math.min(need, bot.reserve)
-          bot.reserve -= take
-          bot.ammo += take
         } else {
           bot.lastShotAt = now
           bot.ammo--
